@@ -4,13 +4,13 @@
 # Desc: The assignment one demo
 #       It will prepare the camera and stream it into port 8000
 #
-import socket
-import time
-import thread
+import socket, time, thread, logging
 from picamera import PiCamera
 from RPi import GPIO
 
 #setup
+logging.basicConfig(filename='dcms.log',level=logging.DEBUG)
+logger=logging.getLogger('dcms')
 bind='0.0.0.0'
 width=640
 height=480
@@ -23,14 +23,14 @@ global recording
 recording=False
 
 def init():
-    print('Initializes the program...')
+    logging.info('Initializes the program...')
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(pin_yellow, GPIO.OUT)
     GPIO.setup(pin_red, GPIO.OUT)
     GPIO.setup(pin_btn, GPIO.IN)
     
 def setready(status):
-    print('Setting status: %s'%status)
+    logging.info('Setting status: %s'%status)
     GPIO.output(pin_yellow, status)
     GPIO.output(pin_red, not status)
 
@@ -41,10 +41,11 @@ def checkbtn():
 	global recording
 	while True:
 		if GPIO.input(pin_btn)==1:
-			print('Captured btn clicked')
+			logging.info('Captured btn clicked')
 			recording=not recording
 			if recording:
 				thread.start_new_thread(stream, ())
+			time.sleep(3)
 		time.sleep(0.5)
 
 def stream():
@@ -57,6 +58,7 @@ def stream():
 		camera.framerate=framerate
 
 		sock=socket.socket()
+		sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		sock.bind((bind, port))
 		sock.listen(0)
 
@@ -64,12 +66,13 @@ def stream():
 		try:
 			camera.start_recording(conn, format='h264')
 			while recording:
-				print('recording')
+				logging.info('recording')
 				camera.wait_recording(1)
 			camera.stop_recording()
 		finally:
 			conn.close()
 			sock.close()
+			logging.debug('Closed Socket')
 			setready(True)
     
 init()
